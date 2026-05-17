@@ -6,6 +6,7 @@ import { useReaderStore } from "@/store/useReaderStore";
 import { ChevronLeft, ChevronRight, Loader2, BookOpen } from "lucide-react";
 import { getBookFile } from "@/utils/db";
 import { getFileBlobFromLibrary } from "@/utils/fileSystem";
+import ePub from "epubjs";
 
 interface EpubReaderProps {
   book: Book;
@@ -13,8 +14,8 @@ interface EpubReaderProps {
 
 export default function EpubReader({ book }: EpubReaderProps) {
   const viewerRef = useRef<HTMLDivElement>(null);
-  const epubBookRef = useRef<EpubBook | null>(null);
-  const renditionRef = useRef<Rendition | null>(null);
+  const epubBookRef = useRef<any | null>(null);
+  const renditionRef = useRef<any | null>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
