@@ -63,6 +63,8 @@ export default function FullscreenReader() {
     removeQuote,
     jumpToCfi,
     addReadingMinutes,
+    comicWidth,
+    setComicWidth,
   } = useReaderStore();
   
   const [showSettings, setShowSettings] = useState(false);
@@ -222,8 +224,10 @@ export default function FullscreenReader() {
                     </div>
                   </div>
 
-                  {/* Font Size Adjuster */}
-                  <div className="flex flex-col gap-1.5">
+                  {!(currentBook.type === "manga" || currentBook.type === "manhwa") ? (
+                    <>
+                      {/* Font Size Adjuster */}
+                      <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[9px] text-zinc-400 font-extrabold uppercase tracking-wider">Ukuran Huruf</span>
                       <span className="text-[11px] font-black text-purple-400">{fontSize}%</span>
@@ -312,6 +316,37 @@ export default function FullscreenReader() {
                       ))}
                     </div>
                   </div>
+                  </>
+                  ) : (
+                    <>
+                      {/* Comic Width Slider */}
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-zinc-400 font-extrabold uppercase tracking-wider">Lebar Halaman (Zoom)</span>
+                          <span className="text-[11px] font-black text-purple-400">{comicWidth}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="450"
+                          max="850"
+                          step="10"
+                          value={comicWidth}
+                          onChange={(e) => setComicWidth(Number(e.target.value))}
+                          className="w-full h-2 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-purple-500 hover:accent-purple-400 transition-all mt-1"
+                        />
+                        <div className="flex justify-between mt-1 px-1">
+                          <span className="text-[9px] text-zinc-500 font-medium">Ramping (Tajam)</span>
+                          <span className="text-[9px] text-zinc-500 font-medium">Lebar Maks (Pecah)</span>
+                        </div>
+                        <button
+                          onClick={() => setComicWidth(768)}
+                          className="mt-2 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 text-[10px] font-bold text-zinc-400 hover:text-white rounded-lg transition-colors border border-zinc-700/50"
+                        >
+                          Reset ke Default (768px)
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

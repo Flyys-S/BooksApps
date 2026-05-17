@@ -8,7 +8,7 @@ import { getFileBlobFromLibrary } from "@/utils/fileSystem";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 
 export default function ComicReader() {
-  const { currentBook, currentCfi, updateProgress } = useReaderStore();
+  const { currentBook, currentCfi, updateProgress, comicWidth } = useReaderStore();
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -224,7 +224,10 @@ export default function ComicReader() {
         </div>
       )}
 
-      <div className="w-full max-w-3xl flex flex-col items-center bg-black min-h-screen">
+      <div 
+        className="w-full flex flex-col items-center bg-black min-h-screen transition-all duration-300"
+        style={{ maxWidth: `${comicWidth}px` }}
+      >
         {images.map((src, index) => (
           <img 
             key={index} 

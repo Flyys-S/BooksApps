@@ -35,6 +35,9 @@ export interface ReaderState {
   quotes: Record<string, QuoteItem[]>;
   customBooks: Book[];
   
+  // Comic Specific States
+  comicWidth: number;
+  
   // Local Folder Sync States
   localFolderPath: string | null;
   isSyncing: boolean;
@@ -76,6 +79,7 @@ export interface ReaderState {
   setFontFamily: (font: "sans" | "serif" | "mono") => void;
   setLineHeight: (height: "tight" | "normal" | "loose") => void;
   setMargins: (margin: "narrow" | "normal" | "wide") => void;
+  setComicWidth: (width: number) => void;
   toggleLikeBook: (bookId: string) => void;
   addBookmark: (bookId: string, cfi: string, percent: number, chapterTitle: string, label?: string) => void;
   removeBookmark: (bookId: string, cfi: string) => void;
@@ -102,6 +106,7 @@ export const useReaderStore = create(
       bookmarks: {},
       quotes: {},
       customBooks: [],
+      comicWidth: 768, // Default max-w-3xl is 768px
       localFolderPath: null,
       isSyncing: false,
       appTheme: "dark",
@@ -293,6 +298,11 @@ export const useReaderStore = create(
       setMargins: (margins) =>
         set({
           margins,
+        }),
+
+      setComicWidth: (comicWidth) =>
+        set({
+          comicWidth,
         }),
 
       toggleLikeBook: (bookId) =>
