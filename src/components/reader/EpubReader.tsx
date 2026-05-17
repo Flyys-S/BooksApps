@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Book } from "@/data/mockData";
 import { useReaderStore } from "@/store/useReaderStore";
 import { ChevronLeft, ChevronRight, Loader2, BookOpen } from "lucide-react";
-import ePub, { Book as EpubBook, Rendition } from "epubjs";
 import { getBookFile } from "@/utils/db";
+import { getFileBlobFromLibrary } from "@/utils/fileSystem";
 
 interface EpubReaderProps {
   book: Book;
@@ -81,6 +81,22 @@ export default function EpubReader({ book }: EpubReaderProps) {
         } catch (err) {
           if (isActive) {
             setError("Gagal memuat buku kustom dari penyimpanan lokal.");
+            setLoading(false);
+          }
+          return;
+        }
+      } else if (!book.epubUrl.startsWith("http") && !book.epubUrl.startsWith("/")) {
+        // Ini adalah file dari local directory (contoh: 'books/novel.epub')
+        try {
+          const blob = await getFileBlobFromLibrary(book.epubUrl);
+          if (blob) {
+            bookUrlOrData = await blob.arrayBuffer();
+          } else {
+            throw new Error("File buku fisik tidak ditemukan di direktori.");
+          }
+        } catch (err) {
+          if (isActive) {
+            setError("Gagal membaca file dari folder perangkat Anda. Pastikan folder masih terhubung.");
             setLoading(false);
           }
           return;

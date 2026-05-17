@@ -1,3 +1,10 @@
+export interface ChapterItem {
+  id: string;
+  title: string;
+  fileName: string;
+  relativePath: string;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -8,6 +15,8 @@ export interface Book {
   description: string;
   publishYear: number;
   type?: "book" | "manga" | "manhwa";
+  chapters?: ChapterItem[]; 
+  isSeries?: boolean;
 }
 
 export interface Genre {

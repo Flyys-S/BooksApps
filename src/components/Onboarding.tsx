@@ -4,8 +4,7 @@ import { useState } from "react";
 import { BookOpen, Palette, FolderSync, CheckCircle2, ArrowRight, ArrowLeft, Loader2, User, Camera, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useReaderStore } from "@/store/useReaderStore";
-import { pickLocalFolder, scanFolderForBooks } from "@/utils/fileSystem";
-import JSZip from "jszip";
+import { pickLocalFolder, setupLibraryFolders, scanLibraryBooks } from "@/utils/fileSystem";
 
 const presetAvatars = [
   { name: "Petualang", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80" },
@@ -58,45 +57,26 @@ export default function Onboarding() {
       if (handle) {
         setLocalFolderPath(handle.name);
         setIsSyncing(true);
-        setSyncStatus("Memindai folder pustaka...");
+        setSyncStatus("Mengonfigurasi struktur sub-folder (books, manga, manhwa)...");
         
         try {
-          const scannedItems = await scanFolderForBooks(handle);
-          if (scannedItems.length === 0) {
-            setSyncStatus("Tidak ada berkas buku/komik (.epub, .cbz) ditemukan.");
+          await setupLibraryFolders(handle);
+          setSyncStatus("Memindai direktori pustaka...");
+          
+          const booksToSave = await scanLibraryBooks(handle);
+          if (booksToSave.length === 0) {
+            setSyncStatus("Pustaka masih kosong. Silakan tambahkan file nanti.");
+            await syncLocalBooks([]);
             setIsSyncing(false);
             return;
           }
 
-          const booksToSave = [];
-          const filesToSave = [];
-
-          for (let i = 0; i < scannedItems.length; i++) {
-            const item = scannedItems[i];
-            setSyncStatus(`Mengekstrak metadata (${i + 1}/${scannedItems.length})...`);
-            
-            try {
-              if (item.type === "book") {
-                const bookData = await extractEpubMetadata(item.file);
-                bookData.type = "book";
-                booksToSave.push(bookData);
-                filesToSave.push({ id: bookData.id, file: item.file });
-              } else {
-                const bookData = await extractCbzMetadata(item.file, item.type);
-                booksToSave.push(bookData);
-                filesToSave.push({ id: bookData.id, file: item.file });
-              }
-            } catch (err) {
-              console.warn(err);
-            }
-          }
-
-          setSyncStatus("Menyimpan pustaka secara aman...");
-          await syncLocalBooks(booksToSave, filesToSave);
+          setSyncStatus("Menyimpan katalog pustaka...");
+          await syncLocalBooks(booksToSave);
           setSyncStatus("Selesai! Pustaka berhasil dihubungkan.");
         } catch (err) {
           console.error(err);
-          setSyncStatus("Terjadi kesalahan saat memindai folder.");
+          setSyncStatus("Terjadi kesalahan saat mengonfigurasi folder.");
         } finally {
           setIsSyncing(false);
         }
@@ -104,48 +84,6 @@ export default function Onboarding() {
     } catch (error) {
       console.error(error);
     }
-  };
-
-  const extractCbzMetadata = async (file: File, type: "manga" | "manhwa"): Promise<any> => {
-    const zip = new JSZip();
-    const contents = await zip.loadAsync(file);
-    const imageFiles = Object.keys(contents.files).filter(
-      name => !contents.files[name].dir && name.match(/\.(jpg|jpeg|png|webp)$/i)
-    ).sort();
-
-    let coverUrl = "";
-    if (imageFiles.length > 0) {
-      const coverBlob = await contents.files[imageFiles[0]].async("blob");
-      coverUrl = URL.createObjectURL(coverBlob);
-    }
-
-    const id = file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '-').toLowerCase() + "-" + Date.now();
-    return {
-      id,
-      title: file.name.replace(/\.[^/.]+$/, ""),
-      author: type === "manga" ? "Manga" : "Manhwa",
-      coverUrl,
-      epubUrl: "", 
-      genreId: type,
-      description: `Koleksi ${type === "manga" ? "Manga" : "Manhwa"} offline.`,
-      publishYear: new Date().getFullYear(),
-      type: type
-    };
-  };
-
-  const extractEpubMetadata = async (file: File): Promise<any> => {
-    const id = file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '-').toLowerCase() + "-" + Date.now();
-    return {
-      id,
-      title: file.name.replace(/\.[^/.]+$/, ""),
-      author: "Penulis Lokal",
-      coverUrl: "",
-      epubUrl: "",
-      genreId: "book",
-      description: "Buku lokal yang diimpor melalui sinkronisasi folder.",
-      publishYear: new Date().getFullYear(),
-      type: "book"
-    };
   };
 
   const saveProfileData = () => {

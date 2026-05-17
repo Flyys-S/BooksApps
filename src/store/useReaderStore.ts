@@ -43,6 +43,7 @@ export interface ReaderState {
   appTheme: "dark" | "light";
   appAccentColor: string;
   isOnboardingCompleted: boolean;
+  editingBookId: string | null;
   userProfile: {
     username: string;
     fullName: string;
@@ -60,10 +61,12 @@ export interface ReaderState {
   addReadingMinutes: (minutes: number) => void;
   setLocalFolderPath: (path: string | null) => void;
   setSyncing: (syncing: boolean) => void;
-  syncLocalBooks: (books: Book[], files: {id: string, file: File}[]) => Promise<void>;
+  setEditingBookId: (id: string | null) => void;
+  syncLocalBooks: (books: Book[]) => Promise<void>;
   
   addCustomBook: (book: Book, fileBlob: Blob) => Promise<void>;
   deleteCustomBook: (bookId: string) => Promise<void>;
+  updateCustomBook: (bookId: string, updatedFields: Partial<Book>) => void;
   playBook: (book: Book) => void;
   pauseBook: () => void;
   closeBook: () => void;
@@ -104,6 +107,7 @@ export const useReaderStore = create(
       appTheme: "dark",
       appAccentColor: "#9333ea", // Default purple
       isOnboardingCompleted: false,
+      editingBookId: null,
       userProfile: {
         username: "raflyrajwa",
         fullName: "Rafly Rajwa",
@@ -140,25 +144,16 @@ export const useReaderStore = create(
 
       setLocalFolderPath: (path) => set({ localFolderPath: path }),
       setSyncing: (syncing) => set({ isSyncing: syncing }),
+      setEditingBookId: (id) => set({ editingBookId: id }),
 
-      syncLocalBooks: async (books, files) => {
+      syncLocalBooks: async (books) => {
         try {
-          // Menyimpan semua file biner secara paralel ke IndexedDB
-          await Promise.all(
-            files.map(({ id, file }) => saveBookFile(id, file))
-          );
-          
           set((state) => {
             // Menggabungkan dan menimpa array customBooks berdasarkan ID unik
-            const newCustomBooks = [...state.customBooks];
-            books.forEach((book) => {
-              const existingIdx = newCustomBooks.findIndex((b) => b.id === book.id);
-              if (existingIdx >= 0) {
-                newCustomBooks[existingIdx] = book;
-              } else {
-                newCustomBooks.unshift(book);
-              }
-            });
+            // Hapus buku-buku lama yang diawali dengan "local-" untuk me-refresh perpustakaan lokal
+            const filteredCustomBooks = state.customBooks.filter(b => !b.id.startsWith("local-"));
+            const newCustomBooks = [...filteredCustomBooks, ...books];
+            
             return { customBooks: newCustomBooks };
           });
         } catch (error) {
@@ -193,6 +188,27 @@ export const useReaderStore = create(
           throw error;
         }
       },
+
+      updateCustomBook: (bookId, updatedFields) =>
+        set((state) => {
+          const updatedCustomBooks = state.customBooks.map((book) => {
+            if (book.id === bookId) {
+              return { ...book, ...updatedFields };
+            }
+            return book;
+          });
+
+          // Jika buku yang sedang dibaca di-edit, perbarui juga currentBook
+          const updatedCurrentBook =
+            state.currentBook?.id === bookId
+              ? { ...state.currentBook, ...updatedFields }
+              : state.currentBook;
+
+          return {
+            customBooks: updatedCustomBooks,
+            currentBook: updatedCurrentBook,
+          };
+        }),
 
       playBook: (book) =>
         set((state) => {

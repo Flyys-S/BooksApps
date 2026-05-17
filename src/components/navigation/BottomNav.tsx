@@ -13,7 +13,7 @@ export default function BottomNav() {
     { href: "/", label: "Home", icon: Home },
     { href: "/search", label: "Search", icon: Search },
     { href: "/collection", label: "Library", icon: Library },
-    { href: `/user/${userProfile.username}`, label: "Profile", icon: User },
+    { href: "/user/me", label: "Profile", icon: User },
   ];
 
   return (

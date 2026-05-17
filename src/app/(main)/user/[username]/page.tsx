@@ -17,9 +17,9 @@ export default function ProfilePage({ params }: ProfilePageProps) {
   const { username } = use(params);
   const { userProfile, likedBookIds, customBooks, bookProgress, appAccentColor } = useReaderStore();
 
-  const isCurrentUser = username === userProfile.username;
+  const isCurrentUser = username === "me" || username === userProfile?.username;
 
-  if (!isCurrentUser) {
+  if (!isCurrentUser || !userProfile) {
     return (
       <div className="min-h-full flex flex-col items-center justify-center p-8 text-zinc-500">
         <p className="mb-4">Profil pengguna tidak ditemukan!</p>
@@ -30,8 +30,8 @@ export default function ProfilePage({ params }: ProfilePageProps) {
     );
   }
 
-  const completedCount = Object.values(bookProgress).filter(p => p.percent >= 95).length;
-  const booksCompleted = userProfile.booksCompleted + completedCount;
+  const completedCount = Object.values(bookProgress || {}).filter(p => p.percent >= 95).length;
+  const booksCompleted = (userProfile.booksCompleted || 0) + completedCount;
 
   return (
     <div className="min-h-full px-6 py-8 md:px-10 md:py-10 max-w-5xl mx-auto">
@@ -126,7 +126,7 @@ export default function ProfilePage({ params }: ProfilePageProps) {
           <div className="space-y-4">
             <div className="flex justify-between items-center text-sm border-b border-zinc-800/50 pb-2">
               <span className="text-zinc-400">Total Buku Disukai (Liked)</span>
-              <span className="font-bold text-white">{likedBookIds.length} Buku</span>
+              <span className="font-bold text-white">{likedBookIds?.length || 0} Buku</span>
             </div>
             <div className="flex justify-between items-center text-sm border-b border-zinc-800/50 pb-2">
               <span className="text-zinc-400">Target Membaca Bulanan</span>

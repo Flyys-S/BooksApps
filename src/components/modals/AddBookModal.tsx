@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, UploadCloud, File, BookPlus, Loader2, Image as ImageIcon } from "lucide-react";
 import { useReaderStore } from "@/store/useReaderStore";
+import { getStoredFolderHandle, saveFileToLibrary, scanLibraryBooks } from "@/utils/fileSystem";
 import ePub from "epubjs";
 import JSZip from "jszip";
 
@@ -24,7 +25,7 @@ export default function AddBookModal({ isOpen, onClose }: AddBookModalProps) {
   const [bookType, setBookType] = useState<"book" | "manga" | "manhwa">("book");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { addCustomBook } = useReaderStore();
+  const { addCustomBook, syncLocalBooks } = useReaderStore();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -153,19 +154,36 @@ export default function AddBookModal({ isOpen, onClose }: AddBookModalProps) {
       ];
       const randomGradient = gradients[Math.floor(Math.random() * gradients.length)];
 
-      const newBook = {
-        id: bookId,
-        title: title,
-        author: author || (bookType === "manga" ? "Manga Artist" : bookType === "manhwa" ? "Manhwa Artist" : "Penulis Tidak Diketahui"),
-        coverUrl: coverBase64 || randomGradient,
-        epubUrl: `custom://${bookId}`, 
-        genreId: "custom",
-        description: `Koleksi ${bookType} yang diunggah secara kustom dari perangkat Anda.`,
-        publishYear: new Date().getFullYear(),
-        type: bookType,
-      };
+      const folderHandle = await getStoredFolderHandle();
 
-      await addCustomBook(newBook, file);
+      if (folderHandle) {
+        // Tulis langsung ke sub-folder di PC pengguna
+        await saveFileToLibrary(
+          folderHandle, 
+          file.name, 
+          file, 
+          bookType, 
+          bookType === "book" ? undefined : title
+        );
+        
+        // Pindai ulang pustaka untuk mensinkronisasi struktur chapter terbaru
+        const allLocalBooks = await scanLibraryBooks(folderHandle);
+        await syncLocalBooks(allLocalBooks);
+      } else {
+        const newBook = {
+          id: bookId,
+          title: title,
+          author: author || (bookType === "manga" ? "Manga Artist" : bookType === "manhwa" ? "Manhwa Artist" : "Penulis Tidak Diketahui"),
+          coverUrl: coverBase64 || randomGradient,
+          epubUrl: `custom://${bookId}`, 
+          genreId: "custom",
+          description: `Koleksi ${bookType} yang diunggah secara kustom dari perangkat Anda.`,
+          publishYear: new Date().getFullYear(),
+          type: bookType,
+        };
+
+        await addCustomBook(newBook, file);
+      }
       
       // Reset state and close
       setFile(null);

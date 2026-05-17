@@ -7,14 +7,17 @@ import MiniReaderBar from "@/components/reader/MiniReaderBar";
 import FullscreenReader from "@/components/reader/FullscreenReader";
 import Onboarding from "@/components/Onboarding";
 import { useReaderStore } from "@/store/useReaderStore";
+import EditBookModal from "@/components/modals/EditBookModal";
 
 export default function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isOnboardingCompleted } = useReaderStore();
+  const { isOnboardingCompleted, editingBookId, setEditingBookId, customBooks } = useReaderStore();
   const [mounted, setMounted] = useState(false);
+
+  const editingBook = customBooks.find(b => b.id === editingBookId) || null;
 
   useEffect(() => {
     setMounted(true);
@@ -41,6 +44,9 @@ export default function MainLayout({
 
       {/* Bottom Nav for Mobile Screen */}
       <BottomNav />
+
+      {/* Global Edit Modal */}
+      {mounted && <EditBookModal isOpen={!!editingBookId} onClose={() => setEditingBookId(null)} book={editingBook} />}
     </div>
   );
 }

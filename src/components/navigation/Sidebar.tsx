@@ -116,7 +116,7 @@ export default function Sidebar() {
         {/* User Footer Profile */}
         <div className="border-t border-border pt-6">
           <Link
-            href={`/user/${userProfile.username}`}
+            href="/user/me"
             className="flex items-center gap-3 p-2 rounded-xl hover:bg-surface-hover/80 transition-all duration-300 group"
           >
             <img
