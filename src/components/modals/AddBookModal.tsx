@@ -166,6 +166,24 @@ export default function AddBookModal({ isOpen, onClose }: AddBookModalProps) {
           bookType === "book" ? undefined : title
         );
         
+        if (bookType !== "book") {
+          const indexInfo = { 
+            title, 
+            author: author || (bookType === "manga" ? "Manga Artist" : "Manhwa Artist"), 
+            description: `Koleksi ${bookType} kustom.` 
+          };
+          const indexBlob = new Blob([JSON.stringify(indexInfo, null, 2)], { type: "application/json" });
+          await saveFileToLibrary(folderHandle, "index.json", indexBlob, bookType, title);
+          
+          if (coverBase64 || randomGradient) {
+            try {
+              const res = await fetch(coverBase64 || randomGradient);
+              const coverBlob = await res.blob();
+              await saveFileToLibrary(folderHandle, "cover.webp", coverBlob, bookType, title);
+            } catch(e) {}
+          }
+        }
+        
         // Pindai ulang pustaka untuk mensinkronisasi struktur chapter terbaru
         const allLocalBooks = await scanLibraryBooks(folderHandle);
         await syncLocalBooks(allLocalBooks);

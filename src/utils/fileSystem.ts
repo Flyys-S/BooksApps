@@ -1,5 +1,7 @@
 import { saveData, getData } from "./db";
 import { Book, ChapterItem } from "@/data/mockData";
+import ePub from "epubjs";
+import JSZip from "jszip";
 
 // Menyimpan nama konstanta untuk handle di IndexedDB
 const DIR_HANDLE_KEY = "bookify-local-dir-handle";
@@ -122,11 +124,36 @@ export const scanLibraryBooks = async (dirHandle: FileSystemDirectoryHandle): Pr
       for await (const entry of booksDir.values()) {
         if (entry.kind === "file" && entry.name.toLowerCase().endsWith(".epub")) {
           const id = `local-book-${entry.name}`;
+          let title = entry.name.replace(".epub", "").replace(/[-_]/g, " ");
+          let author = "Local Library";
+          let coverUrl = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=150&h=200&q=80";
+
+          try {
+            const file = await entry.getFile();
+            const arrayBuffer = await file.arrayBuffer();
+            const bookObj = ePub(arrayBuffer);
+            await bookObj.ready;
+            
+            const metadata = await bookObj.loaded.metadata;
+            if (metadata.title) title = metadata.title;
+            if (metadata.creator) author = metadata.creator;
+
+            const coverPath = await bookObj.loaded.cover;
+            if (coverPath) {
+              const coverBlobUrl = await bookObj.archive.createUrl(coverPath, { base64: true });
+              if (coverBlobUrl) {
+                coverUrl = coverBlobUrl as string;
+              }
+            }
+          } catch (err) {
+            console.warn("Gagal ekstrak metadata EPUB:", entry.name);
+          }
+
           books.push({
             id,
-            title: entry.name.replace(".epub", ""),
-            author: "Local Library",
-            coverUrl: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=150&h=200&q=80",
+            title,
+            author,
+            coverUrl,
             epubUrl: `books/${entry.name}`, // Menyimpan relative path
             genreId: "fiksi",
             description: "Buku lokal dari folder Anda.",
@@ -277,6 +304,12 @@ export const getFileBlobFromLibrary = async (relativePath: string): Promise<Blob
   try {
     const rootHandle = await getStoredFolderHandle();
     if (!rootHandle) return null;
+    
+    const hasPerm = await verifyPermission(rootHandle, false);
+    if (!hasPerm) {
+      console.warn("Tidak ada izin untuk membaca folder pustaka.");
+      return null;
+    }
     
     const parts = relativePath.split('/');
     let currentHandle: FileSystemDirectoryHandle | FileSystemFileHandle = rootHandle;
