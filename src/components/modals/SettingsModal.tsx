@@ -2,9 +2,7 @@ import { useState, useEffect } from "react";
 import { X, Settings2, FolderSync, Palette, Info, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useReaderStore } from "@/store/useReaderStore";
-import { pickLocalFolder, getStoredFolderHandle, scanFolderForBooks, disconnectLocalFolder, verifyPermission, ScannedFile } from "@/utils/fileSystem";
-import ePub from "epubjs";
-import JSZip from "jszip";
+import { pickLocalFolder, getStoredFolderHandle, setupLibraryFolders, scanLibraryBooks, disconnectLocalFolder, verifyPermission } from "@/utils/fileSystem";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -47,43 +45,23 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const performSync = async (handle: FileSystemDirectoryHandle) => {
     setSyncing(true);
-    setSyncStatus({ message: "Memindai folder...", progress: 0 });
+    setSyncStatus({ message: "Mengonfigurasi folder...", progress: 15 });
     
     try {
-      const scannedItems = await scanFolderForBooks(handle);
+      await setupLibraryFolders(handle);
+      setSyncStatus({ message: "Memindai pustaka lokal...", progress: 50 });
       
-      if (scannedItems.length === 0) {
+      const booksToSave = await scanLibraryBooks(handle);
+      
+      if (booksToSave.length === 0) {
         setSyncStatus({ message: "Tidak ada file buku/komik ditemukan.", progress: 100 });
         setTimeout(() => setSyncStatus(null), 3000);
         setSyncing(false);
         return;
       }
 
-      const booksToSave = [];
-      const filesToSave = [];
-
-      for (let i = 0; i < scannedItems.length; i++) {
-        const item = scannedItems[i];
-        setSyncStatus({ message: `Mengekstrak metadata (${i + 1}/${scannedItems.length})...`, progress: Math.round((i / scannedItems.length) * 100) });
-        
-        try {
-          if (item.type === "book") {
-            const bookData = await extractEpubMetadata(item.file);
-            bookData.type = "book";
-            booksToSave.push(bookData);
-            filesToSave.push({ id: bookData.id, file: item.file });
-          } else {
-            const bookData = await extractCbzMetadata(item.file, item.type);
-            booksToSave.push(bookData);
-            filesToSave.push({ id: bookData.id, file: item.file });
-          }
-        } catch (err) {
-          console.warn(`Gagal memproses file ${item.file.name}:`, err);
-        }
-      }
-
-      setSyncStatus({ message: "Menyimpan ke IndexedDB...", progress: 95 });
-      await syncLocalBooks(booksToSave, filesToSave);
+      setSyncStatus({ message: "Menyimpan ke Pustaka...", progress: 85 });
+      await syncLocalBooks(booksToSave);
       
       setSyncStatus({ message: "Sinkronisasi berhasil!", progress: 100 });
       setTimeout(() => setSyncStatus(null), 3000);
@@ -95,102 +73,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     } finally {
       setSyncing(false);
     }
-  };
-
-  const extractCbzMetadata = async (file: File, type: "manga" | "manhwa"): Promise<any> => {
-    try {
-      const zip = new JSZip();
-      const contents = await zip.loadAsync(file);
-      
-      const imageFiles = Object.keys(contents.files).filter(
-        name => !contents.files[name].dir && name.match(/\.(jpg|jpeg|png|webp)$/i)
-      ).sort();
-
-      let coverUrl = "";
-      if (imageFiles.length > 0) {
-        const coverBlob = await contents.files[imageFiles[0]].async("blob");
-        coverUrl = URL.createObjectURL(coverBlob);
-      }
-
-      const id = file.name.replace(/\.[^/.]+$/, "").replace(/\s+/g, '-').toLowerCase() + "-" + Date.now();
-      
-      return {
-        id,
-        title: file.name.replace(/\.[^/.]+$/, ""),
-        author: type === "manga" ? "Manga" : "Manhwa",
-        coverUrl,
-        epubUrl: "", 
-        genreId: type,
-        description: `Koleksi ${type === "manga" ? "Manga" : "Manhwa"} yang disinkronisasi dari folder lokal.`,
-        publishYear: new Date().getFullYear(),
-        type: type
-      };
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
-  };
-
-  const extractEpubMetadata = async (file: File): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const arrayBuffer = e.target?.result as ArrayBuffer;
-          const book = ePub(arrayBuffer);
-          const metadata = await book.loaded.metadata;
-          const coverUrlPath = await book.loaded.cover;
-          
-          let compressedCover = "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=400&h=600&q=80";
-          if (coverUrlPath) {
-            const coverBlob = await book.archive.createUrl(coverUrlPath, { base64: true });
-            compressedCover = await compressCover(coverBlob);
-          }
-
-          const safeTitle = metadata.title || file.name.replace(".epub", "");
-          // Prefix 'custom_' memastikan sinkronisasi yang konsisten dan menghindari konflik
-          const bookId = `custom_sync_${safeTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
-          resolve({
-            id: bookId,
-            title: metadata.title || file.name,
-            author: metadata.creator || "Penulis Tidak Diketahui",
-            coverUrl: compressedCover,
-            epubUrl: `custom://${bookId}`,
-            genreId: "fiksi",
-            description: metadata.description || "Buku ini diimpor melalui sinkronisasi folder PC lokal Anda.",
-            publishYear: new Date().getFullYear(),
-          });
-        } catch (err) {
-          reject(err);
-        }
-      };
-      reader.onerror = reject;
-      reader.readAsArrayBuffer(file);
-    });
-  };
-
-  const compressCover = (coverUrl: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "Anonymous";
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 300;
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          resolve(coverUrl);
-          return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.7));
-      };
-      img.onerror = () => reject(new Error("Gagal memuat gambar sampul"));
-      img.src = coverUrl;
-    });
   };
 
   const handleDisconnect = async () => {
